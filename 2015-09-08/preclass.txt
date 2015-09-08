@@ -22,31 +22,42 @@ something into an already-full cache.
 the memory-based AI of this code? (Hint: What is the memory-based AI of just the
 innermost loop?)
 
-Doesn't it depend on the "# flops" in the numerator? What is the speed of the 
-processor we're running on? Is it assumed to be the Xeon processors in the cluster?
-Either way, I would expect the denominator to be large, because if one complete  
+Unless there are FMA shenanigans going on, each iteration of the inner loop takes
+2 flops to compute (a multiply and an add). So it takes 2N^3 flops to compute every
+element of matrix C, because each cell (C[i,j] = tmp) takes N iterations of the inner 
+loop to compute, and there are N^2 cells. For memory accesses, if one complete  
 run of the inner loop (N iterations loading 16 bytes each) overflows the cache, 
 each iteration of the middle loop will need to transfer all 16N bytes from memory
-to cache.
+to cache. The middle loop runs N times, for 16N^2 total bytes transferred, and
+the outer loop runs N times, making the total 16N^3 bytes by the time the outer
+loop is finished. So AI = 2N^3 / 16N^3 = 1/8 for this program.
 
 2. Now suppose that the cache is substantially larger than 16N, but
 substantially smaller than 8N^2. What is the AI now?
 
-Well, I still don't know how to calculate the numerator, but the denominator will 
-now be smaller, because the 16N bytes loaded by one complete run of the inner 
+The number of flops hadn't changed, but the number of memory accesses will now 
+be smaller, because the 16N bytes loaded by one complete run of the inner 
 loop will stay in cache and be available to the next iteration of the middle 
 loop. Since the bytes loaded from A row i will still be useful on the next 
 iteration (in which only j has been incremented), the next iteration of the 
-middle loop will only load the 8N bytes from B column j+1 into memory.
+middle loop will only load the 8N bytes from B column j+1 into memory. On the 
+other hand, since 8N^2 doesn't fit into cache, a complete run of the middle loop
+will overflow the cache, so there is no re-use between iterations of the outer loop.
+This means a complete run of the middle loop will transfer 8N^2 total bytes, and
+all N iterations of the outer loop will transfer 8N^3 total bytes. So now 
+AI = 2N^3 / 8N^3 = 1/4.
 
 3. Now suppose the cache is large enough to hold all of A, B, and C. What is the
 AI now? (Hint: Writing to a byte of memory not already in the cache incurs two
 memory transfers: one to move the data to the cache for writing, and one to move
 the written data back to main memory.)
 
-I don't have time to figure out how this temporary matrix "C" works. I've never 
-seen this "naive matrix multiplication" before and I don't understand how it works.
-
+Even though all the matrices fit in memory, the data still needs to be loaded the
+first time it is accessed, so you need to load at least 8N^2 + 8N^2 = 16N^2 bytes to
+load all of matrices A and B (each is N^2 cells of 8 bytes each). Given the hint, 
+writing all N cells of C takes 16N^2 bytes of memory access, so there's a total of
+32N^2 bytes of memory access to read and write everything in cache. With the same
+number of flops, AI = 2N^3 / 32N^2 = N/16.
 
 4. Cache overflowing. On my CPU (Intel i7-4700 HQ), L1, L2, and L3 caches are 32
 KB, 256 KB, and 6 MB respectively. What is the largest problem size N that will
