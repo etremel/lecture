@@ -64,13 +64,41 @@ KB, 256 KB, and 6 MB respectively. What is the largest problem size N that will
 fit in each cache? What is the arithmetic intensity associated with each problem
 size?
 
+Let's assume that in order for the problem to "fit in" cache, all 3 matrices need
+to fit. Technically matrix C doesn't need to fit because each element of C is only
+written once, but if the cache isn't big enough to hold all 3 matrices, writing
+an element of C might evict a cached element of B that would be needed in the 
+next iteration of the outer loop (since the CPU will automatically cache the 
+element of C that was written). How much extra space is needed to make sure that
+A and B stay cached despite C being written depends on the associativity of the 
+cache, and I don't know how to estimate that. Under this assumption, the cache 
+needs to be at least 24N^2 bytes (to hold 8N^2 bytes per matrix), so to fit in
+the 32KB L1 cache, N can be at most sqrt(32000/24) = 36 (rounded down). For the 
+problem to fit in the L2 cache, N can be at most 103, and for the problem to fit
+in the L3 cache, N can be at most 500.
+
+To calculate the arithmetic intensity, I'll assume that the formula from problem
+3 applies, since all the matrices will fit in (some level of) cache. For N=36, 
+AI = 36/16 = 2.25. For N=103, AI = 103/16 = 6.44. For N=500, AI = 500/16 = 31.25.
 
 5. My CPU has 4 cores, each of which can do 8 fused multiply-adds per cycle, has
 a clock rate of 2.4 GHz, and a memory bandwidth of 25.6 GB/s. At what arithmetic
 intensity does my machine become CPU-bound?
 
+The peak flop rate is 8 FMA/cycle/core * 4 cores * 2400000000 cycles/second = 
+76.8 Gflop/second. In order for the computation to be CPU-bound, the CPU must 
+do at least 76.8 billion flops for every 25.6 billion bytes of data (assuming 
+the data it gets in 1 second is used for computation that same second), so the 
+code needs to have an AI of 76.8/25.6 = 3.
 
 6. So, for what size range for N will naive matmul be CPU-bound on my machine?
 
+Since the small sizes of N fit entirely in cache and have N / 16 arithmetic 
+intensity, the smallest N that will have AI at least 3 is 48. For N > 500 the
+data will not fit in cache and the arithmetic intensity becomes a constant 1/4.
+So the range of N that will be CPU-bound is 48-500.
 
 7. So, what will a plot of Flops/sec vs N look like?
+
+It will rise from N=1 to N=48, then hit a plateau at the CPU flops/sec limit for
+N=48 to N=500, then decrease after N=500 as there are more and more cache misses.
