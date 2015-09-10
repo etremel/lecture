@@ -3,12 +3,55 @@
    host cores are used, for the moment).  How do things change with
    the addition of the two Phi boards?
 
+I don't remember and can't find the number we agreed on in class for the 
+theoretical peak flop rate of the Xeon E5-2620 processor, so I'm going to 
+recalculate it with some educated guesses. If we assume that the number of
+vector FMAs per core per cycle is 2 like the slides say (even though I know
+that's for a different processor, this information is very hard to find on 
+Intel's website), then the peak flop rate is 2 flops/FMA * 4 FMA/vector FMA 
+* 2 vector FMAs/cycle * 6 cores * 3.2e9 cycles/sec = 3.072e11 flops/sec for a
+Xeon E5-2620. 
+
+I drew a graph with a line sloping up from near the origin to a ridge point
+at (5.2, 307), and a flat line at 307 Gflops/s after that, but I don't have a
+scanner at home and I can't find any good software for plotting graphs of 
+piecewise functions. I'll have to add the picture to my pull request after
+class, when I have access to a scanner.
+
+I'm not sure how adding the two phi boards would change this graph; it depends
+on whether the code is able to use both the Xeon processor and the Phi boards
+at the same time. So maybe it would increase the peak flop rate to 307 + 1011
++ 1011 = 2328 Gflops/s, or maybe the peak flop rate would only be 1101 Gflops/s
+because multiple boards aren't simply additive. Also, the Phi boards have a 
+much higher memory bandwidth of 320Gb/s, so the slope of the memory-limited line
+would depend on whether the code was running on the Xeon processor or the Phi 
+boards; there doesn't seem to be a good way to "combine" them into one line.
+
 2. What is the difference between two cores and one core with
    hyperthreading?
+
+In a processor with two cores, each core has its own L1 and probably L2 cache,
+so the two cores can work on disjoint sets of data in parallel without polluting
+each others' caches as long as they have a small working set. With one core that
+has hyperthreading, there is only one cache hierarchy even though there are two 
+hardware threads (two sets of instructions being executed in parallel), so the 
+two threads will be competing for space in the same caches. This is OK if they 
+share a lot of data, but can lead to lots of cache misses if they have disjoint
+working sets.
 
 3. Do a Google search to find a picture of how memories are arranged
    on the Phi architecture.  Describe the setup briefly in your own
    words.  Is the memory access uniform or non-uniform?
+   
+Most of the results I get show the cores in the Phi architecture arranged in a 
+ring connected by a bidirectional bus, with the main memory controllers connected
+to one or both edges of the (elliptical) ring. Each core has its own private L2
+cache block and its own tag directory for remote cache invalidation. This looks
+like a non-uniform memory access setup, since data in a core's local cache will 
+be faster to access than data cached at another core. Access to main memory may 
+also be "non-uniform," if it is faster for the cores placed closer to the memory
+controller than for the cores farther away (though this difference may be 
+negligible if the bus is much faster than the main memory latencey). 
 
 4. Consider the parallel dot product implementations suggested in the
    slides.  As a function of the number of processors, the size of the
@@ -17,3 +60,20 @@
    [Note that dot products have low arithmetic intensity -- the
     roofline model may be useful for reasoning about the peak
     performance for computing pieces of the dot product]
+
+Several implementations are mentioned in the slides (assuming I'm reading the right
+slides), so I'm assuming this is talking about the implementation where each 
+processor computes some partial sum, then sends it to another processor in a 
+message, and processors that receive a partial sum message add it to their 
+partial sum. In this case, as the number of processors increases, but the size
+of the vectors stays constant, I would expect the speed to increase only until 
+it reaches the bottleneck of the message-passing interconnect. At this point
+the processors will spend most of their time waiting for messages with partial
+sums, since they have so little to compute but the message bus is saturated, so 
+adding more processors will actually make things worse. As the time to send a 
+message decreases, the I expect the speed to increase until it reaches the limit
+of the memory bus bandwidth, since this will be the limiting factor in 
+determining how long each processor spends computing its portion of the dot 
+product. The speedup gained by decreasing the message passing time will be more
+noticeable the more processors there are compared to the size of the vectors, 
+since this means there are more messages to be sent per unit of arithmetic.
