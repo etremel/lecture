@@ -4,15 +4,51 @@ If you run "make glider", you can see a small example of running
 the glider pattern for a few generations.
 
 0.  How much time did you spend on this pre-class exercise, and when?
+About two hours Monday evening, only half of which was spent actually working 
+because I was too tired to concentrate for very long. I gave up before finishing
+so that I might have some hope of getting a semblance of sleep. This does not 
+count the time I spent watching the lecture slides over the weekend. 
 
 1.  What are one or two points that you found least clear in the
     9/15 slide decks (including the narration)?
+	
+The discussion of "Lumped Parameter Models" and "Distributed Parameter Models"
+(in the first set of slides) didn't make much sense because I had no experience
+with the things it referred to: ODEs and PDEs (I've heard of them but never 
+solved them), SPICE, "models with beams and plates", chemical kinetics, etc.
+I don't really understand what "Lumped" and "Distributed" even mean in these 
+names. 
+
+The "forced example" equation was confusing because the terms in the equation 
+didn't match the description - it said there was a long-range attractive force
+proportional to r^-2, but the equation has a Universal Gravity-like term with 
+r^3 in the denominator. Fortunately it didn't matter much because the subsequent
+discussion (simulating local vs. long-distance forces) talked about each simple 
+component force separately.
+
+The equation under "masking communication with computation" was never explained.
+Beta / gamma as a lower bound for n makes rough sense (we want t_comp to be >=
+t_comm, and I guess we can drop alpha), but where did the big complex term in 
+the middle come from?
 
 2.  In the basic implementation provided, what size board for the Game
     of Life would fit in L3 cache for one of the totient nodes?  Add a
     timer to the code and run on the totient node.  How many cells per
     second can we update for a board that fits in L3 cache?  For a
     board that does not fit?
+	
+It looks like each Xeon board on the Totient nodes has a 15MB L3 cache, and the 
+code says each cell of the board is represented by a byte (though that seems 
+inefficient, and I would have guessed each cell only needs one bit to store, I
+can't parse the complicated array access code that actually reads cell entries
+to figure out if it's using bit packing). To compute on a board in cache, we
+actually need to fit two copies of the board in cache, since there's the current
+and previous boards, so the cache would hold a board with up to 7.5 million cells.
+Since boards seem to always be square, this would be a maximum size board of 
+2738x2738.
+
+I'll come back to the second part of this when I have time to actually get 
+code running on the cluster.
 
 3.  Assuming that we want to advance time by several generations,
     suggest a blocking strategy that would improve the operational
@@ -20,12 +56,36 @@ the glider pattern for a few generations.
     not dilute, so that we must still consider every cell.  You may
     want to try your hand at implementing your strategy (though you
     need not spend too much time on it).
+	
+Wait, you mean "blocking" the time so that we advance several generations at 
+once? How would you even do that? You could easily skip generations if some 
+parts of the board are quiescent, but the question specifically rules out that
+scenario, and the only kinds of batching discussed in the slides are batching 
+by space, not time. I haven't the foggiest idea where to begin; I would have to
+spend some time studying the Game of Life and see if I could figure out any 
+kind of function that would allow me to predict a cell's state several generations
+in the future, maybe based on common patterns of time progression.
 
 4.  Comment on what would be required to parallelize this code
     according to the domain decomposition strategy outlined in the
     slides.  Do you think you would see good speedups on one of
     the totient nodes?  Why or why not?
 
+We would need to split each copy of the board into several blocks, each of which
+would be worked on by a different processor, and keep a thread-local data structure
+for each processor for it to record its neighboring blocks and which processors
+own them. We would then need to implement a message-passing system in shared memory
+(since shared memory is the only paradigm C supports) to enable processors to 
+send messages to their neighbors when they create or destroy a cell on their 
+block's boundary, and a barrier synchronization system to ensure no processor 
+got more than a generation ahead of any other. Depending on the sparsity of the
+initial board state, we could see a good speedup on the totient nodes if we 
+chose a per-processor block size that fit in the L2 cache, which is local to 
+each processor (minus the cache space required for the message-passing memory).
+However, a simple domain decomposition like this wouldn't help if the game board
+was very dilute, or if most of the game's activity occurred at the boundaries 
+between blocks, due to the communication overhead.
+	
 5.  Suppose we want to compute long-range interactions between two
     sets of particles in parallel using the obvious n^2 algorithm in a
     shared-memory setting.  A naive implementation might look like
