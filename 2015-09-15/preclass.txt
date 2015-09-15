@@ -109,3 +109,18 @@ between blocks, due to the communication overhead.
     Based on what you know about memories and parallel architecture,
     do you see any features of this approach that are likely to lead
     to poor performance?
+	
+Although the range of particles "owned" by processor p can be cached locally
+to that processor (assuming each processor is assigned a chunk that can fit in
+its cache), applying forces to an "owned" particle involves reading from many 
+"non-owned" particles, which will not be cached and cannot all fit in cache.
+Thus, iterating through the range of particles outside the processor's "owned"
+range will incur lots of cache misses, and possibly also evict the processor's 
+own particles from the cache (even though they will be needed again) because 
+the non-owned particles must be moved to the processor's cache in order to be 
+read. Another problem with this approach is that every time a processor writes 
+to a particle it "owns," it will cause cache coherence traffic to every other 
+processor that has read that particle recently (and thus has a copy in its local 
+cache). This could cause a major slowdown for a sufficiently bad interleaving
+of processors, such as running the processor that updates particle x right after
+every other processor has read particle x.
