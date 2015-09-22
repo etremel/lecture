@@ -47,8 +47,10 @@ and previous boards, so the cache would hold a board with up to 7.5 million cell
 Since boards seem to always be square, this would be a maximum size board of 
 2738x2738.
 
-I'll come back to the second part of this when I have time to actually get 
-code running on the cluster.
+I still can't get the code to run on the cluster because PBS scripts are 
+confusing, but David ran it and found that we can update cells at a rate of 
+3.5e-8 for a board that fits in the L3 cache, and also for a board that does 
+not fit in the L3 cache.
 
 3.  Assuming that we want to advance time by several generations,
     suggest a blocking strategy that would improve the operational
