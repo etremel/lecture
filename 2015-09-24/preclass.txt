@@ -1,7 +1,24 @@
 0.  How much time did you spend on this pre-class exercise, and when?
+Current: 10min
 
 1.  What are one or two points that you found least clear in the
     9/24 slide decks (including the narration)?
+
+Some of the OpenMP examples were confusing and incompletely explained, and I
+wish I could have been there to ask the lecturer questions. Why does #pragma 
+omp for occur inside #pragma omp parallel, when omp "parallel for loops" are
+described as "forking off several threads to complete the for loop in parallel"?
+Doesn't this mean that each thread going through the outer #pragma omp parallel
+will spawn several sub-threads when it gets to #pragma omp for? In that case, 
+won't all the sub-threads clobber each other on their parent thread's single 
+copy of my_dot? The task framework was also confusing at first, though I think
+I get it after staring long enough: the #pragma omp parallel is followed 
+immediately by a #pragma omp single in order to make a bunch of threads that 
+have nothing to do, so they pick up the tasks that are created by the single 
+thread when it does #pragma omp task, right?
+
+There's a bug in the audio at the end of the second slideshow: "This is not-
+this is not-this is not-normally details, but..."
 
 2.  The omp_mc.c file in the demo subdirectory runs a Monte Carlo
     simulation to estimate the expected value of a uniform random
