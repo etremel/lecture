@@ -38,6 +38,11 @@ Time = (Serial execution time)(Fraction of serial code + (Fraction of parallel c
 Time = (N*(t_trial+t_update))
        *(t_update/(t_trial+t_update) + (t_trial/(t_trial+t_update))/p)
 
+Correction: 
+Time in serial code = N * t_update / B <--B is the batch size, missing from the prompt
+Time in parallel code = N * t_trial / p
+Time = N/B * t_update + N/p * t_trial
+
     b) Run the code with a few different parameter values in order
        to estimate N, t_trial, and t_update for this code on
        a totient compute node.
@@ -54,6 +59,12 @@ as it caused only 1 trial to be run). Then I assumed that the time spent on
 trials was the t_trial I estimated previously, so the time spent on updates is 
 N * t_trial. 
 t_update = (.023234 - (1000002 * 7.0045e-9)) / 1000002 = 1.623e-8 seconds
+
+Using an experiment in which we run with three different batch sizes and fixed
+number of processors, we can solve three instances of T = N/B * t_update + N/p * t_trial
+with three different values of B (so T1 = N/B1...etc). For example, one is
+11.0095 = 10^11 / 10000 * t_update + 10^11 / 24 * t_trial
+We get t_update = 3.0637e-7, t_trial = 2.5651e-8
 	   
     c) Based on your model, suggest a strategy for choosing the batch
        size.  How might you generalize this strategy to automatically
