@@ -1,5 +1,5 @@
 0.  How much time did you spend on this pre-class exercise, and when?
-Current: 10min
+2 hours, Wednesday afternoon and evening.
 
 1.  What are one or two points that you found least clear in the
     9/24 slide decks (including the narration)?
@@ -29,17 +29,73 @@ this is not-this is not-normally details, but..."
        terms of the number of trials (N), number of processors (p),
        time per trial (t_trial), and time to update the global
        counters in the critical section (t_update).
+	   
+I'm guessing this question has the same problem a similar question on the last
+pre-class questions had: it neglects to include a variable for the batch size,
+which is important in determining the runtime. Assuming B is the batch size, we
+still have 
+Time in serial code = N / B * t_update
+Time in parallel code = N / p * t_trial
+Total time = N/B * t_update + N/p * t_trial
 
     b) Run the code with a few different parameter values in order
        to estimate N, t_trial, and t_update for this code on
        a totient compute node.
+	   
+I'll do this like we did in class last time.
+	   
+Trials: 
+N = 10024000, B = 1000, p = 24, T = .05348015
+N = 10048000, B = 2000, p = 24, T = .03424215
+N = 10120000, B = 5000, p = 24, T = .07123995
 
+This gives us the system of equations:
+10024000 / 1000 * t_update + 10024000 / 24 * t_trial = .05348015
+10048000 / 2000 * t_update + 10048000 / 24 * t_trial = .03424215
+10120000 / 5000 * t_update + 10120000 / 24 * t_trial = .07123995
+
+Unfortunately, I have no idea how to use MATLAB code to automatically solve this
+like Dave did in class (I have never used MATLAB), so I'll have to do it by
+hand. I don't know how to solve an overconstrained system by hand (how do I 
+combine the extra data?), so I'll just throw out one of the equations and do 
+basic algebra. Solving it with the first two equations, I get
+t_trial = 3.5532e-8
+t_update = 3.8547e-6
+	   
     c) Based on your model, suggest a strategy for choosing the batch
        size.  How might you generalize this strategy to automatically
        choose batch sizes for different types of computational
        experiments?
+	   
+Now that we have these values, we can write T = N/B * 3.85e-6 + N/p * 3.55e-8.
+Assuming a constant p, we would like N/B to be at least 100 times smaller than 
+N/p, since t_update is (roughly) 100 times larger than t_trial. So, naively, we 
+could say that the best batch size is 100*p. Of course, this doesn't really 
+account for the fact that N grows linearly with B, so increasing B will also
+increase N/p by virtue of increasing N. The best way to really solve this 
+problem would be to get a concrete equation for N in terms of B, but I don't 
+have time to do that right now.
 
 3.  The "OpenMP pitfalls" paper describes some common pitfalls (both
     performance and correctness) in OpenMP codes.  Go through the
     checklist in the paper for omp_mc.c.  What performance mistakes
     are there in the demonstration implementation?
+	
+One of the mistakes listed is "using #critical when #atomic would be sufficient."
+I don't know how #atomic works, but a quick Google for documentation shows that
+it is intended to be used to "ensure a specific storage location is accessed 
+atomically" and it has both "read" and "write" versions. Since the is_converged
+function accesses the shared result object in a read-only manner, perhaps it 
+could be guarded with #atomic read instead of being included in the critical 
+section. If this works the way I think it does, it would allow all the threads
+to concurrently read from the result object as long as no one was writing to it
+(and writers would block on their critical sections as usual).
+
+It could also just be the mistake of "putting too much work in the critical 
+region." It's possible that the critical region that updates the global counters
+could be shortened by clever use of more thread-local variables, like a 
+reduction. Also, the critical region around seed = random() could be made 
+unnecessary if we used a smarter random number generator that did not have 
+global state, as suggested in class last time.
+
+
