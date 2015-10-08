@@ -1,7 +1,17 @@
 0.  How much time did you spend on this pre-class exercise, and when?
 
+About an hour, Wednesday night.
+
 1.  What are one or two points that you found least clear in the
     10/08 slide decks (including the narration)?
+
+The "other variants" of MPI_Send were confusing. What's the difference between 
+MPI_Bsend, where the "user provides the buffer," and the zero-copy asynchronous
+send mentioned earlier, where the user promises not to touch the data while it's
+being sent? For MPI_Rsend, how does the sender know that the receivers have called
+receive? Does this incur an extra communication overhead?
+
+Also, there was an audio bug in the second slide set, on slide 15.
 
 2.  Now that we are now basically a third of the way into the
     semester, and are (mostly) settled into the steady pace of things,
@@ -9,6 +19,26 @@
     about the class.  Comments on things I can reasonably change are
     particularly useful -- venting about the cluster, for example, is
     understandable but doesn't help me that much in adjusting!
+	
+The project was a good way to practice implementing some of the memory-access
+optimizations we saw in class, and I liked that we didn't have a speed goal we
+had to meet (so it was OK if optimizations that we tried didn't work; we could
+just report that). 
+
+The pre-class lecture slides and exercises are a regular source of pain and 
+suffering for me. Watching the lecture slides takes a long time, and sometimes
+the narration moves too slowly but I don't want to skip ahead for fear of 
+missing something important. By the time I've finished watching the lecture 
+slides, it's usually late at night the day before class, and the exercises can
+be hard to answer when I'm tired at the end of a long day. Regardless of how 
+long it takes me to answer them, though, I almost always end up getting 
+insufficient sleep because the class is so early in the morning and there just
+isn't enough time before 11pm to both watch the slides and answer the questions.
+It's even worse when there is also a reading assignment, like the Roofline 
+paper, that I can't start until after I've watched the lecture slides. Although
+this class looks to have fairly little homework on paper (just a few programming
+projects), keeping up with the pre-class exercises makes it feel like a high 
+school class with homework every night.
 
 3.  The ring demo implements the protocol described in the particle
     systems slide deck from 9/15:
@@ -17,9 +47,34 @@
 
     a) In your own words, describe what ring.c is doing.
 
+First, it generates some "particles" owned by each processor by just permuting 
+the processor's rank several times, and each processor independently computes 
+the interactions among the particles it owns. Then, in the main loop, each 
+processor sends its current buffer of particle data (particles that have 
+finished interacting with that processor's particles) on to the next-highest-
+ranked processor, and receives a buffer of particle data from the next-lower-
+ranked processor. It computes interactions between its owned particles and the
+particle data received from the previous processor, then continues to the next 
+iteration (sending this data on and receiving more new particles). This 
+continues for as many iterations as there are processors, so that all processors
+eventually compute on every other processor's data.
+
     b) How might you modify the code to have the same computational
        pattern, but using non-blocking communication rather than
        MPI_Sendrecv?  Note that according to the MPI standard,
        one isn't supposed to read from a buffer that is being
        handled by a non-blocking send, so it is probably necessary
        to use three temporary buffers rather than the current two.
+	   
+The code could be modified to essentially have three stages for particle 
+buffers: receiving, current, and sending. While the processor is computing 
+interactions with the current particles, it can be sending a buffer of 
+particles that it already computed interactions on (in the last round), and 
+receiving a buffer of particles from the previous-ranked processor. This would
+involve a setup phase to fill the pipeline, since in the first round each 
+processor would have nothing to compute on while it waited for the particles 
+from the previous processor. After that, the send and receive would be started
+at the beginning of the loop, then the current interactions would be computed,
+then the processor would wait on the send completing to swap the current buffer
+with the send buffer, and wait on the receive completing to swap the receive 
+buffer with the current buffer.
